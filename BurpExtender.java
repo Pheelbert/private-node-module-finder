@@ -1,4 +1,5 @@
 package burp;
+
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -20,7 +21,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
 		this.previouslyAnalyzedURLs = new ArrayList<URL>();
 		callbacks.registerHttpListener(this);
 	}
-	
+
 	public ArrayList<String> findModules(String responseBody) {
 		// Look at all enclosed strings in body and extract module name
 		ArrayList<String> moduleNames = new ArrayList<String>();
@@ -28,43 +29,44 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
 		String nodeModulesString = "node_modules/";
 		for (String line : responseBody.split("\n")) {
 			int nodeModulesIndex = line.indexOf(nodeModulesString);
-            while (nodeModulesIndex >= 0) {
-                int nodeModulesEndIndex = line.indexOf(nodeModulesString) + nodeModulesString.length();
+			while (nodeModulesIndex >= 0) {
+				int nodeModulesEndIndex = line.indexOf(nodeModulesString) + nodeModulesString.length();
 
-                if (nodeModulesEndIndex <= line.length()) {
-		        	int nextSlashIndex = line.indexOf("/", nodeModulesEndIndex);
+				if (nodeModulesEndIndex <= line.length()) {
+					int nextSlashIndex = line.indexOf("/", nodeModulesEndIndex);
 
-		        	if (nextSlashIndex >= 0) {
-			        	String moduleName = line.substring(nodeModulesEndIndex, nextSlashIndex);
-		                if (!moduleNames.contains(moduleName)) {
-		                	moduleNames.add(moduleName);
-		                }
-		        	}
-	
-	                line = line.substring(nodeModulesEndIndex);
-                }
-                nodeModulesIndex = line.indexOf(nodeModulesString);
-            }
+					if (nextSlashIndex >= 0) {
+						String moduleName = line.substring(nodeModulesEndIndex, nextSlashIndex);
+						if (!moduleNames.contains(moduleName)) {
+							moduleNames.add(moduleName);
+						}
+					}
+
+					line = line.substring(nodeModulesEndIndex);
+				}
+				nodeModulesIndex = line.indexOf(nodeModulesString);
+			}
 		}
 
-        return moduleNames;
+		return moduleNames;
 	}
 
-	// Requests https://registry.npmjs.org/<module_name> and return true if status code is 200
+	// Requests https://registry.npmjs.org/<module_name> and return true if status
+	// code is 200
 	private boolean isNodeModulePublic(String moduleName) {
 		final String PUBLIC_NODE_REGISTRY_URL_STRING = "registry.npmjs.org";
 		String publicNodeModuleUrlString = String.format("https://%s/%s", PUBLIC_NODE_REGISTRY_URL_STRING, moduleName);
 
-        try {
-        	URL url = new URL(publicNodeModuleUrlString);
-            HttpURLConnection http = (HttpURLConnection)url.openConnection();
-            int statusCode = http.getResponseCode();
-            return statusCode == 200;
-    	} catch (Exception e) {
-    		this.stdout.println("Failed to make request to '" + publicNodeModuleUrlString + "': " + e.getMessage());
-    	}
-        
-        return false;
+		try {
+			URL url = new URL(publicNodeModuleUrlString);
+			HttpURLConnection http = (HttpURLConnection) url.openConnection();
+			int statusCode = http.getResponseCode();
+			return statusCode == 200;
+		} catch (Exception e) {
+			this.stdout.println("Failed to make request to '" + publicNodeModuleUrlString + "': " + e.getMessage());
+		}
+
+		return false;
 	}
 
 	@Override
@@ -94,22 +96,23 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
 			// Find and show modules to user
 			ArrayList<String> moduleNames = findModules(bodyString);
 
-	        // Verify if any of the mentioned modules aren't public. If so, report it.
-	        for (String moduleName : moduleNames) {
-	        	if (!isNodeModulePublic(moduleName)) {
-	        		this.stdout.println("'" + url.toString() + "' | Private module found: " + moduleName);
+			// Verify if any of the mentioned modules aren't public. If so, report it.
+			for (String moduleName : moduleNames) {
+				if (!isNodeModulePublic(moduleName)) {
+					this.stdout.println("'" + url.toString() + "' | Private module found: " + moduleName);
 
-	        		// TODO: Add highlighting like in: https://github.com/PortSwigger/example-scanner-checks/blob/master/java/BurpExtender.java
-			        IHttpRequestResponse[] messageInfoArray = new IHttpRequestResponse[] { messageInfo };
-			        PrivateNodeModuleScanIssue issue = new PrivateNodeModuleScanIssue(httpService, url, messageInfoArray, moduleName);
-			        callbacks.addScanIssue(issue);
-	        	}
-	        }
+					// TODO: Add highlighting like in:
+					// https://github.com/PortSwigger/example-scanner-checks/blob/master/java/BurpExtender.java
+					IHttpRequestResponse[] messageInfoArray = new IHttpRequestResponse[] { messageInfo };
+					PrivateNodeModuleScanIssue issue = new PrivateNodeModuleScanIssue(httpService, url, messageInfoArray, moduleName);
+					callbacks.addScanIssue(issue);
+				}
+			}
 
-	        // Add to list so we don't analyze again
+			// Add to list so we don't analyze again
 			if (!this.previouslyAnalyzedURLs.contains(url)) {
 				this.previouslyAnalyzedURLs.add(url);
-            }
+			}
 		}
 	}
 }
